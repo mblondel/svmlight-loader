@@ -3,7 +3,7 @@
 svmlight-loader
 ===============
 
-This is a fast and memory efficient for the svmlight / libsvm sparse data file format.
+This is a fast and memory efficient loader for the svmlight / libsvm sparse data file format in Python.
 
 
 Install
