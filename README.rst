@@ -47,6 +47,15 @@ Public datasets
 
 Public datasets in svmlight / libsvm format available at http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/
 
+License
+=======
+
+Simple BSD.
+
+Authors
+=======
+
+Mathieu Blondel and Lars Buitinck
 
 
 
