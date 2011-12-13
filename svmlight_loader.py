@@ -13,7 +13,7 @@ import scipy.sparse as sp
 from _svmlight_loader import _load_svmlight_file
 
 
-def load_svmlight_file(file_path, n_features=None, dtype=np.float64,
+def load_svmlight_file(file_path, n_features=None, dtype=None,
                        buffer_mb=40):
     """Load datasets in the svmlight / libsvm format into sparse CSR matrix
 
@@ -58,13 +58,15 @@ def load_svmlight_file(file_path, n_features=None, dtype=np.float64,
     else:
         shape = None    # inferred
 
-    data = np.array(data, dtype=dtype)
+    if dtype:
+        data = np.array(data, dtype=dtype)
+
     X_train = sp.csr_matrix((data, indices, indptr), shape)
 
     return (X_train, labels)
 
 
-def load_svmlight_files(files, n_features=None, dtype=np.float64, buffer_mb=40):
+def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     """Load dataset from multiple files in SVMlight format
 
     This function is equivalent to mapping load_svmlight_file over a list of
