@@ -5,8 +5,9 @@ from StringIO import StringIO
 from numpy.testing import assert_equal, assert_array_equal
 from nose.tools import raises
 
-from sklearn.datasets import (load_svmlight_file, load_svmlight_files,
-                              dump_svmlight_file)
+from svmlight_loader import (load_svmlight_file, load_svmlight_files,
+                             dump_svmlight_file)
+from sklearn.datasets import load_svmlight_file as sk_load_svmlight_file
 
 currdir = os.path.dirname(os.path.abspath(__file__))
 datafile = os.path.join(currdir, "data", "svmlight_classification.txt")
@@ -102,6 +103,6 @@ def test_dump():
         f = StringIO()
         dump_svmlight_file(X, y, f)
         f.seek(0)
-        X2, y2 = load_svmlight_file(f)
+        X2, y2 = sk_load_svmlight_file(f)
         assert_array_equal(Xd, X2.toarray())
         assert_array_equal(y, y2)
