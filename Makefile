@@ -1,8 +1,11 @@
+PYTHON ?= python
+NOSETESTS ?= nosetests
+
 build:
-	python setup.py build_ext --inplace
+	$(PYTHON) setup.py build_ext --inplace
 
 clean:
 	rm -rf build *.so *.pyc
 
 test:
-	nosetests
+	$(NOSETESTS)
