@@ -14,7 +14,7 @@ from _svmlight_loader import _load_svmlight_file
 
 
 def load_svmlight_file(file_path, n_features=None, dtype=None,
-                       buffer_mb=40):
+                       buffer_mb=40, zero_based="auto"):
     """Load datasets in the svmlight / libsvm format into sparse CSR matrix
 
     This format is a text-based format, with one sample per line. It does
@@ -52,6 +52,10 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
           y is a ndarray of shape (n_samples,).
     """
     data, indices, indptr, labels = _load_svmlight_file(file_path, buffer_mb)
+
+    if zero_based is False or \
+       (zero_based == "auto" and np.min(indices) > 0):
+       indices -= 1
 
     if n_features is not None:
         shape = (indptr.shape[0] - 1, n_features)
@@ -113,18 +117,21 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     return result
 
 
-def _dump_svmlight(X, y, f):
+def _dump_svmlight(X, y, f, zero_based):
     if X.shape[0] != y.shape[0]:
-        raise ValueError("X.shape[0] and y.shape[0] should be the same.")
+        raise ValueError("X.shape[0] and y.shape[0] should be the same, "
+                         "got: %r and %r instead." % (X.shape[0], y.shape[0]))
 
     is_sp = int(hasattr(X, "tocsr"))
 
+    one_based = not zero_based
     for i in xrange(X.shape[0]):
-        s = " ".join(["%d:%f" % (j, X[i, j]) for j in X[i].nonzero()[is_sp]])
-        f.write("%f %s\n" % (y[i], s))
+        s = u" ".join([u"%d:%f" % (j + one_based, X[i, j])
+                       for j in X[i].nonzero()[is_sp]])
+        f.write((u"%f %s\n" % (y[i], s)).encode('ascii'))
 
 
-def dump_svmlight_file(X, y, f):
+def dump_svmlight_file(X, y, f, zero_based=True):
     """Dump the dataset in svmlight / libsvm file format.
 
     This format is a text-based format, with one sample per line. It does
@@ -142,10 +149,16 @@ def dump_svmlight_file(X, y, f):
     y : array-like, shape = [n_samples]
         Target values.
 
-    f : str or file-like
+    f : str or file-like in binary mode
+        If string it specifies the path that will contain the data.
+        If f is a file-like then data will be written to f.
+
+    zero_based : boolean, optional
+        Whether column indices should be written zero-based (True) or one-based
+        (False).
     """
     if hasattr(f, "write"):
-        _dump_svmlight(X, y, f)
+        _dump_svmlight(X, y, f, zero_based)
     else:
-        with open(f, "w") as f:
-            _dump_svmlight(X, y, f)
+        with open(f, "wb") as f:
+            _dump_svmlight(X, y, f, zero_based)
