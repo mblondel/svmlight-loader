@@ -11,6 +11,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from _svmlight_loader import _load_svmlight_file
+from _svmlight_loader import _dump_svmlight_file
 
 
 def load_svmlight_file(file_path, n_features=None, dtype=None,
@@ -117,20 +118,6 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     return result
 
 
-def _dump_svmlight(X, y, f, zero_based):
-    if X.shape[0] != y.shape[0]:
-        raise ValueError("X.shape[0] and y.shape[0] should be the same, "
-                         "got: %r and %r instead." % (X.shape[0], y.shape[0]))
-
-    is_sp = int(hasattr(X, "tocsr"))
-
-    one_based = not zero_based
-    for i in xrange(X.shape[0]):
-        s = u" ".join([u"%d:%f" % (j + one_based, X[i, j])
-                       for j in X[i].nonzero()[is_sp]])
-        f.write((u"%f %s\n" % (y[i], s)).encode('ascii'))
-
-
 def dump_svmlight_file(X, y, f, zero_based=True):
     """Dump the dataset in svmlight / libsvm file format.
 
@@ -142,23 +129,28 @@ def dump_svmlight_file(X, y, f, zero_based=True):
 
     Parameters
     ----------
-    X : {array-like, sparse matrix}, shape = [n_samples, n_features]
+    X : CSR sparse matrix, shape = [n_samples, n_features]
         Training vectors, where n_samples is the number of samples and
         n_features is the number of features.
 
     y : array-like, shape = [n_samples]
         Target values.
 
-    f : str or file-like in binary mode
-        If string it specifies the path that will contain the data.
-        If f is a file-like then data will be written to f.
+    f : str
+        Specifies the path that will contain the data.
 
     zero_based : boolean, optional
         Whether column indices should be written zero-based (True) or one-based
         (False).
     """
     if hasattr(f, "write"):
-        _dump_svmlight(X, y, f, zero_based)
-    else:
-        with open(f, "wb") as f:
-            _dump_svmlight(X, y, f, zero_based)
+        raise ValueError("File handler not supported. Use a file path.")
+
+    if X.shape[0] != y.shape[0]:
+        raise ValueError("X.shape[0] and y.shape[0] should be the same, "
+                         "got: %r and %r instead." % (X.shape[0], y.shape[0]))
+
+    X = sp.csr_matrix(X, dtype=np.float64)
+    y = np.array(y, dtype=np.float64)
+
+    _dump_svmlight_file(f, X.data, X.indices, X.indptr, y, int(zero_based))

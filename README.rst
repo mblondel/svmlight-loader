@@ -3,7 +3,8 @@
 svmlight-loader
 ===============
 
-This is a fast and memory efficient loader for the svmlight / libsvm sparse data file format in Python.
+This is a fast and memory efficient loader (and writer...) for the svmlight /
+libsvm sparse data file format in Python.
 
 
 Install
@@ -24,7 +25,8 @@ http://scikit-learn.org/dev/datasets/index.html#datasets-in-svmlight-libsvm-form
 Public datasets
 ===============
 
-Public datasets in svmlight / libsvm format available at http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/
+Public datasets in svmlight / libsvm format available at
+http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/
 
 License
 =======

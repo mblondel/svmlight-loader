@@ -1,6 +1,5 @@
 import numpy as np
-import os.path
-from StringIO import StringIO
+import os
 
 from numpy.testing import assert_equal, assert_array_equal
 from nose.tools import raises
@@ -96,13 +95,13 @@ def test_invalid_filename():
 
 
 def test_dump():
-    Xs, y = load_svmlight_file(datafile)
-    Xd = Xs.toarray()
-
-    for X in (Xs, Xd):
-        f = StringIO()
-        dump_svmlight_file(X, y, f, zero_based=False)
-        f.seek(0)
-        X2, y2 = sk_load_svmlight_file(f)
-        assert_array_equal(Xd, X2.toarray())
+    try:
+        Xs, y = load_svmlight_file(datafile)
+        tmpfile = "tmp_dump.txt"
+        dump_svmlight_file(Xs, y, tmpfile, zero_based=False)
+        X2, y2 = sk_load_svmlight_file(tmpfile)
+        assert_array_equal(Xs.toarray(), X2.toarray())
         assert_array_equal(y, y2)
+    finally:
+        os.remove(tmpfile)
+
