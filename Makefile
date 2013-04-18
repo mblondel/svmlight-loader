@@ -1,7 +1,9 @@
 PYTHON ?= python
 NOSETESTS ?= nosetests
 
-build:
+build: _svmlight_loader.so
+
+_svmlight_loader.so: _svmlight_loader.cpp
 	$(PYTHON) setup.py build_ext --inplace
 
 clean:
