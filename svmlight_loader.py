@@ -52,7 +52,7 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
     where X is a scipy.sparse matrix of shape (n_samples, n_features),
           y is a ndarray of shape (n_samples,).
     """
-    data, indices, indptr, labels = _load_svmlight_file(file_path, buffer_mb)
+    data, indices, indptr, labels, comments = _load_svmlight_file(file_path, buffer_mb)
 
     if zero_based is False or \
        (zero_based == "auto" and np.min(indices) > 0):
@@ -68,7 +68,7 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
 
     X_train = sp.csr_matrix((data, indices, indptr), shape)
 
-    return (X_train, labels)
+    return (X_train, labels, comments)
 
 
 def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
@@ -118,7 +118,7 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     return result
 
 
-def dump_svmlight_file(X, y, f, zero_based=True):
+def dump_svmlight_file(X, y, f, comment, zero_based=True):
     """Dump the dataset in svmlight / libsvm file format.
 
     This format is a text-based format, with one sample per line. It does
@@ -139,6 +139,9 @@ def dump_svmlight_file(X, y, f, zero_based=True):
     f : str
         Specifies the path that will contain the data.
 
+    comment : list, len = n_samples
+        Comments to append to each row after a # character
+
     zero_based : boolean, optional
         Whether column indices should be written zero-based (True) or one-based
         (False).
@@ -150,7 +153,12 @@ def dump_svmlight_file(X, y, f, zero_based=True):
         raise ValueError("X.shape[0] and y.shape[0] should be the same, "
                          "got: %r and %r instead." % (X.shape[0], y.shape[0]))
 
+    if X.shape[0] != len(comment):
+        raise ValueError("X.shape[0] and len(comment) should be the same, "
+                         "got: %r and %r instead." % (X.shape[0], len(comment)))
+
     X = sp.csr_matrix(X, dtype=np.float64)
     y = np.array(y, dtype=np.float64)
+    #comment = np.array(comment, dtype=np.string_)
 
-    _dump_svmlight_file(f, X.data, X.indices, X.indptr, y, int(zero_based))
+    _dump_svmlight_file(f, X.data, X.indices, X.indptr, y, comment, int(zero_based))

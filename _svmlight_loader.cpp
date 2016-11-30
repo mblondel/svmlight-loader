@@ -150,7 +150,8 @@ static PyObject *to_1d_array(std::vector<T> &v, int typenum)
 static PyObject *to_csr(std::vector<double> &data,
                         std::vector<int> &indices,
                         std::vector<int> &indptr,
-                        std::vector<double> &labels)
+                        std::vector<double> &labels,
+                        std::vector<std::string> &comments)
 {
   // We could do with a smart pointer to Python objects here.
   std::exception const *exc = 0;
@@ -158,17 +159,26 @@ static PyObject *to_csr(std::vector<double> &data,
            *indices_arr = 0,
            *indptr_arr = 0,
            *labels_arr = 0,
+           *comments_arr = 0,
            *ret_tuple = 0;
 
   try {
-    data_arr    = to_1d_array(data, NPY_DOUBLE);
-    indices_arr = to_1d_array(indices, NPY_INT);
-    indptr_arr  = to_1d_array(indptr, NPY_INT);
-    labels_arr  = to_1d_array(labels, NPY_DOUBLE);
+    data_arr     = to_1d_array(data, NPY_DOUBLE);
+    indices_arr  = to_1d_array(indices, NPY_INT);
+    indptr_arr   = to_1d_array(indptr, NPY_INT);
+    labels_arr   = to_1d_array(labels, NPY_DOUBLE);
 
-    ret_tuple = Py_BuildValue("OOOO",
+    std::vector<std::string>::const_iterator it;
+    comments_arr = PyList_New(0);
+    for(it = comments.begin(); it != comments.end() ; it++ ){
+        //printf("%s\n",it->c_str());
+        PyList_Append(comments_arr, Py_BuildValue("s", it->c_str()));
+    }
+
+    ret_tuple = Py_BuildValue("OOOOO",
                               data_arr, indices_arr,
-                              indptr_arr, labels_arr);
+                              indptr_arr, labels_arr, comments_arr);
+
   } catch (std::exception const &e) {
     exc = &e;
   }
@@ -180,6 +190,7 @@ static PyObject *to_csr(std::vector<double> &data,
   Py_XDECREF(indices_arr);
   Py_XDECREF(indptr_arr);
   Py_XDECREF(labels_arr);
+  Py_XDECREF(comments_arr);
 
   if (exc)
     throw *exc;
@@ -207,7 +218,9 @@ void parse_line(const std::string& line,
                 std::vector<double> &data,
                 std::vector<int> &indices,
                 std::vector<int> &indptr,
-                std::vector<double> &labels)
+                std::vector<double> &labels,
+                std::vector<std::string> &comments
+                )
 {
   if (line.length() == 0)
     throw SyntaxError("empty line");
@@ -217,26 +230,49 @@ void parse_line(const std::string& line,
 
   // FIXME: we shouldn't be parsing line-by-line.
   // Also, we might catch more syntax errors with failbit.
-  std::istringstream in(line);
+  size_t hashIdx = line.find('#');
+  std::istringstream in(line.substr(0, hashIdx));
   in.exceptions(std::ios::badbit);
 
+    //printf("%s\n",line.substr(0,hashIdx).c_str());
   double y;
   if (!(in >> y)) {
     throw SyntaxError("non-numeric or missing label");
   }
-
   labels.push_back(y);
   indptr.push_back(data.size());
+
+  std::string qidNonsense;
+  if (!(in >> qidNonsense)) {
+    throw SyntaxError("Missing qid label");
+  }
 
   char c;
   double x;
   unsigned idx;
+  
+
+  if (sscanf(qidNonsense.c_str(), "qid:%lf", &x) != 1) {
+    if(sscanf(qidNonsense.c_str(), "%u%c%lf", &idx, &c, &x) == 3) {
+        indices.push_back(int(idx));
+        data.push_back(x);
+    }
+    else {
+      throw SyntaxError(std::string("expected ':', got '") + c + "'");
+    }
+  }
 
   while (in >> idx >> c >> x) {
     if (c != ':')
       throw SyntaxError(std::string("expected ':', got '") + c + "'");
     indices.push_back(int(idx));
     data.push_back(x);
+  }
+  if (hashIdx != std::string::npos) {
+    comments.push_back(&line[hashIdx+1]);
+  }
+  else {
+    comments.push_back("");
   }
 }
 
@@ -248,7 +284,9 @@ void parse_file(char const *file_path,
                 std::vector<double> &data,
                 std::vector<int> &indices,
                 std::vector<int> &indptr,
-                std::vector<double> &labels)
+                std::vector<double> &labels,
+                std::vector<std::string> &comments
+                )
 {
   std::vector<char> buffer(buffer_size);
 
@@ -262,7 +300,7 @@ void parse_file(char const *file_path,
 
   std::string line;
   while (std::getline(file_stream, line))
-    parse_line(line, data, indices, indptr, labels);
+    parse_line(line, data, indices, indptr, labels, comments);
   indptr.push_back(data.size());
 }
 
@@ -286,9 +324,10 @@ static PyObject *load_svmlight_file(PyObject *self, PyObject *args)
 
     std::vector<double> data, labels;
     std::vector<int> indices, indptr;
-    parse_file(file_path, buffer_size, data, indices, indptr, labels);
-
-    return to_csr(data, indices, indptr, labels);
+    std::vector<std::string> comments;
+    parse_file(file_path, buffer_size, data, indices, indptr, labels, comments);
+    //printf("Just before to_csr\n");
+    return to_csr(data, indices, indptr, labels, comments);
 
   } catch (SyntaxError const &e) {
     PyErr_SetString(PyExc_ValueError, e.what());
@@ -318,23 +357,26 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
     // Read function arguments.
     char const *file_path;
     PyArrayObject *indices_array, *indptr_array, *data_array, *label_array;
+    PyObject * comment_array;
     int zero_based;
 
     if (!PyArg_ParseTuple(args,
-                          "sO!O!O!O!i",
+                          "sO!O!O!O!O!i",
                           &file_path,
                           &PyArray_Type, &data_array,
                           &PyArray_Type, &indices_array,
                           &PyArray_Type, &indptr_array,
                           &PyArray_Type, &label_array,
+                          &PyList_Type, &comment_array,
                           &zero_based))
       return 0;
 
-    int n_samples = indptr_array->dimensions[0] - 1;
-    double *data = (double*) data_array->data;
-    int *indices = (int*) indices_array->data;
-    int *indptr = (int*) indptr_array->data;
-    double *y = (double*) label_array->data;
+    int n_samples  = indptr_array->dimensions[0] - 1;
+    double *data   = (double*) data_array->data;
+    int *indices   = (int*) indices_array->data;
+    int *indptr    = (int*) indptr_array->data;
+    double *y      = (double*) label_array->data;
+    //char **comment = (char**) comment_array->data;
 
     std::ofstream fout;
     fout.open(file_path, std::ofstream::out);
@@ -348,7 +390,9 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
           idx++;
         fout << idx << ":" << data[jj] << " ";
       }
-      fout << std::endl;
+      PyObject* pStrObj = PyList_GetItem(comment_array, i);
+      char *cString = PyBytes_AsString(pStrObj);
+      fout << "# " << cString << " " << std::endl;
     }
 
     fout.close();
@@ -393,8 +437,25 @@ PyMODINIT_FUNC init_svmlight_loader(void)
    || PyType_Ready(&IntVOwnerType)    < 0)
     return;
 
+#if PY_MAJOR_VERSION >= 3
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "_svmlight_loader",     /* m_name */
+        svmlight_format_doc,  /* m_doc */
+        -1,                  /* m_size */
+        svmlight_format_methods,    /* m_methods */
+        NULL,                /* m_reload */
+        NULL,                /* m_traverse */
+        NULL,                /* m_clear */
+        NULL,                /* m_free */
+    };
+#endif
+#if PY_MAJOR_VERSION >= 3
+    PyModule_Create(&moduledef);
+#else
   Py_InitModule3("_svmlight_loader",
                  svmlight_format_methods,
                  svmlight_format_doc);
+#endif
 }
 }
