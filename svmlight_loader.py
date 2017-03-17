@@ -52,7 +52,7 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
     where X is a scipy.sparse matrix of shape (n_samples, n_features),
           y is a ndarray of shape (n_samples,).
     """
-    data, indices, indptr, labels, comments = _load_svmlight_file(file_path, buffer_mb)
+    data, indices, indptr, labels, comments, qids = _load_svmlight_file(file_path, buffer_mb)
 
     if zero_based is False or \
        (zero_based == "auto" and np.min(indices) > 0):
@@ -68,7 +68,7 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
 
     X_train = sp.csr_matrix((data, indices, indptr), shape)
 
-    return (X_train, labels, comments)
+    return (X_train, labels, comments, qids)
 
 
 def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):

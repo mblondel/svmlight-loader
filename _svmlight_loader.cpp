@@ -30,7 +30,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
 /*
  * A Python object responsible for memory management of our vectors.
  */
@@ -148,6 +147,7 @@ static PyObject *to_1d_array(std::vector<T> &v, int typenum)
 
 
 static PyObject *to_csr(std::vector<double> &data,
+                        std::vector<int> &qids,
                         std::vector<int> &indices,
                         std::vector<int> &indptr,
                         std::vector<double> &labels,
@@ -156,6 +156,7 @@ static PyObject *to_csr(std::vector<double> &data,
   // We could do with a smart pointer to Python objects here.
   std::exception const *exc = 0;
   PyObject *data_arr = 0,
+           *qids_arr = 0,
            *indices_arr = 0,
            *indptr_arr = 0,
            *labels_arr = 0,
@@ -164,6 +165,7 @@ static PyObject *to_csr(std::vector<double> &data,
 
   try {
     data_arr     = to_1d_array(data, NPY_DOUBLE);
+    qids_arr     = to_1d_array(qids, NPY_INT);
     indices_arr  = to_1d_array(indices, NPY_INT);
     indptr_arr   = to_1d_array(indptr, NPY_INT);
     labels_arr   = to_1d_array(labels, NPY_DOUBLE);
@@ -175,9 +177,9 @@ static PyObject *to_csr(std::vector<double> &data,
         PyList_Append(comments_arr, Py_BuildValue("s", it->c_str()));
     }
 
-    ret_tuple = Py_BuildValue("OOOOO",
+    ret_tuple = Py_BuildValue("OOOOOO",
                               data_arr, indices_arr,
-                              indptr_arr, labels_arr, comments_arr);
+                              indptr_arr, labels_arr, comments_arr, qids_arr);
 
   } catch (std::exception const &e) {
     exc = &e;
@@ -187,6 +189,7 @@ static PyObject *to_csr(std::vector<double> &data,
   // so we need to decrease it before returning the tuple,
   // regardless of error status.
   Py_XDECREF(data_arr);
+  Py_XDECREF(qids_arr);
   Py_XDECREF(indices_arr);
   Py_XDECREF(indptr_arr);
   Py_XDECREF(labels_arr);
@@ -216,6 +219,7 @@ public:
  */
 void parse_line(const std::string& line,
                 std::vector<double> &data,
+                std::vector<int> &qids,
                 std::vector<int> &indices,
                 std::vector<int> &indptr,
                 std::vector<double> &labels,
@@ -252,7 +256,7 @@ void parse_line(const std::string& line,
   unsigned idx;
   
 
-  if (sscanf(qidNonsense.c_str(), "qid:%lf", &x) != 1) {
+  if (sscanf(qidNonsense.c_str(), "qid:%u", &idx) != 1) {
     if(sscanf(qidNonsense.c_str(), "%u%c%lf", &idx, &c, &x) == 3) {
         indices.push_back(int(idx));
         data.push_back(x);
@@ -260,6 +264,9 @@ void parse_line(const std::string& line,
     else {
       throw SyntaxError(std::string("expected ':', got '") + c + "'");
     }
+  }
+  else {
+      qids.push_back(int(idx));
   }
 
   while (in >> idx >> c >> x) {
@@ -282,6 +289,7 @@ void parse_line(const std::string& line,
 void parse_file(char const *file_path,
                 size_t buffer_size,
                 std::vector<double> &data,
+                std::vector<int> &qids,
                 std::vector<int> &indices,
                 std::vector<int> &indptr,
                 std::vector<double> &labels,
@@ -300,7 +308,7 @@ void parse_file(char const *file_path,
 
   std::string line;
   while (std::getline(file_stream, line))
-    parse_line(line, data, indices, indptr, labels, comments);
+    parse_line(line, data, qids, indices, indptr, labels, comments);
   indptr.push_back(data.size());
 }
 
@@ -323,11 +331,11 @@ static PyObject *load_svmlight_file(PyObject *self, PyObject *args)
     size_t buffer_size = buffer_mb * 1024 * 1024;
 
     std::vector<double> data, labels;
-    std::vector<int> indices, indptr;
+    std::vector<int> indices, indptr, qids;
     std::vector<std::string> comments;
-    parse_file(file_path, buffer_size, data, indices, indptr, labels, comments);
+    parse_file(file_path, buffer_size, data, qids, indices, indptr, labels, comments);
     //printf("Just before to_csr\n");
-    return to_csr(data, indices, indptr, labels, comments);
+    return to_csr(data, qids, indices, indptr, labels, comments);
 
   } catch (SyntaxError const &e) {
     PyErr_SetString(PyExc_ValueError, e.what());
@@ -376,7 +384,6 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
     int *indices   = (int*) indices_array->data;
     int *indptr    = (int*) indptr_array->data;
     double *y      = (double*) label_array->data;
-    //char **comment = (char**) comment_array->data;
 
     std::ofstream fout;
     fout.open(file_path, std::ofstream::out);
@@ -391,7 +398,13 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
         fout << idx << ":" << data[jj] << " ";
       }
       PyObject* pStrObj = PyList_GetItem(comment_array, i);
+
+      #if PY_MAJOR_VERSION >= 3
+      PyObject* strObj = PyUnicode_AsUTF8String(pStrObj);
+      char *cString = PyBytes_AsString(strObj);
+      #else
       char *cString = PyBytes_AsString(pStrObj);
+      #endif
       fout << "# " << cString << " " << std::endl;
     }
 
@@ -427,15 +440,16 @@ static PyMethodDef svmlight_format_methods[] = {
 static const char svmlight_format_doc[] =
   "Loader/Writer for svmlight / libsvm datasets - C++ helper routines";
 
-extern "C" {
-PyMODINIT_FUNC init_svmlight_loader(void)
+//extern "C" {
+// KDR added a second underscore for python3 compatibility
+PyMODINIT_FUNC PyInit__svmlight_loader(void)
 {
   _import_array();
 
   init_type_objs();
   if (PyType_Ready(&DoubleVOwnerType) < 0
    || PyType_Ready(&IntVOwnerType)    < 0)
-    return;
+    return NULL;
 
 #if PY_MAJOR_VERSION >= 3
     static struct PyModuleDef moduledef = {
@@ -449,13 +463,11 @@ PyMODINIT_FUNC init_svmlight_loader(void)
         NULL,                /* m_clear */
         NULL,                /* m_free */
     };
-#endif
-#if PY_MAJOR_VERSION >= 3
-    PyModule_Create(&moduledef);
+    return PyModule_Create(&moduledef);
 #else
   Py_InitModule3("_svmlight_loader",
                  svmlight_format_methods,
                  svmlight_format_doc);
 #endif
 }
-}
+//}
