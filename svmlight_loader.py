@@ -15,7 +15,8 @@ from _svmlight_loader import _dump_svmlight_file
 
 
 def load_svmlight_file(file_path, n_features=None, dtype=None,
-                       buffer_mb=40, zero_based="auto"):
+                       buffer_mb=40, zero_based="auto", query_id=False,
+                       comment=False):
     """Load datasets in the svmlight / libsvm format into sparse CSR matrix
 
     This format is a text-based format, with one sample per line. It does
@@ -69,11 +70,18 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
         data = np.array(data, dtype=dtype)
 
     X_train = sp.csr_matrix((data, indices, indptr), shape)
+    if query_id and comment:
+        return (X_train, labels, comments, qids)
+    elif query_id:
+        return (X_train, labels, qids)
+    elif comment:
+        return (X_train, labels, comments)
+    else:
+        return (X_train, labels)
 
-    return (X_train, labels, comments, qids)
 
-
-def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
+def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40,
+                        comment=False, query_id=False):
     """Load dataset from multiple files in SVMlight format
 
     This function is equivalent to mapping load_svmlight_file over a list of
@@ -97,7 +105,7 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     -------
     [X1, y1, ..., Xn, yn]
 
-    where each (Xi, yi) pair is the result from load_svmlight_file(files[i]).
+    where each (Xi, yi, [comment_i, query_id_i]) tuple is the result from load_svmlight_file(files[i]).
 
     Rationale
     ---------
@@ -111,11 +119,11 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     load_svmlight_file
     """
     files = iter(files)
-    result = list(load_svmlight_file(next(files), n_features, dtype, buffer_mb))
+    result = list(load_svmlight_file(next(files), n_features, dtype, buffer_mb, comment=comment, query_id=query_id))
     n_features = result[0].shape[1]
 
     for f in files:
-        result += load_svmlight_file(f, n_features, dtype, buffer_mb)
+        result += load_svmlight_file(f, n_features, dtype, buffer_mb, comment=comment, query_id=query_id)
 
     return result
 
@@ -162,17 +170,15 @@ def dump_svmlight_file(X, y, f, comment=None, query_id=None, zero_based=True):
 
     if comment is None: 
         comment = []
-    else:
-        if X.shape[0] != len(comment):
+    elif X.shape[0] != len(comment):
             raise ValueError("X.shape[0] and len(comment) should be the same, "
                          "got: %r and %r instead." % (X.shape[0], len(comment)))
 
     if query_id is None:
         query_id = []
-    else:
-        if X.shape[0] != len(comment):
-            raise ValueError("X.shape[0] and len(comment) should be the same, "
-                         "got: %r and %r instead." % (X.shape[0], len(comment)))
+    elif X.shape[0] != len(query_id):
+            raise ValueError("X.shape[0] and len(query_id) should be the same, "
+                         "got: %r and %r instead." % (X.shape[0], len(query_id)))
 
     X = sp.csr_matrix(X, dtype=np.float64)
     y = np.array(y, dtype=np.float64)
