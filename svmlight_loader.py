@@ -111,7 +111,7 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     load_svmlight_file
     """
     files = iter(files)
-    result = list(load_svmlight_file(files.next(), n_features, dtype, buffer_mb))
+    result = list(load_svmlight_file(next(files), n_features, dtype, buffer_mb))
     n_features = result[0].shape[1]
 
     for f in files:
