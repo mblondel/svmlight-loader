@@ -365,17 +365,18 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
     // Read function arguments.
     char const *file_path;
     PyArrayObject *indices_array, *indptr_array, *data_array, *label_array;
-    PyObject * comment_array;
+    PyObject *comment_array, *query_ids_array;
     int zero_based;
 
     if (!PyArg_ParseTuple(args,
-                          "sO!O!O!O!O!i",
+                          "sO!O!O!O!O!O!i",
                           &file_path,
                           &PyArray_Type, &data_array,
+                          &PyList_Type,  &query_ids_array,
                           &PyArray_Type, &indices_array,
                           &PyArray_Type, &indptr_array,
                           &PyArray_Type, &label_array,
-                          &PyList_Type, &comment_array,
+                          &PyList_Type,  &comment_array,
                           &zero_based))
       return 0;
 
@@ -390,22 +391,34 @@ static PyObject *dump_svmlight_file(PyObject *self, PyObject *args)
 
     int idx;
     for (int i=0; i < n_samples; i++) {
-      fout << y[i] << " ";
+      if (PyList_Size(query_ids_array) != 0) {
+        PyObject* pIntObj = PyList_GetItem(query_ids_array, i);
+        long qid = PyLong_AsLong(pIntObj);
+        fout << y[i] << " qid:" << qid << " ";
+      }
+      else {
+        fout << y[i] << " ";
+      }
+
       for (int jj=indptr[i]; jj < indptr[i+1]; jj++) {
         idx = indices[jj];
         if (!zero_based)
           idx++;
         fout << idx << ":" << data[jj] << " ";
       }
-      PyObject* pStrObj = PyList_GetItem(comment_array, i);
-
-      #if PY_MAJOR_VERSION >= 3
-      PyObject* strObj = PyUnicode_AsUTF8String(pStrObj);
-      char *cString = PyBytes_AsString(strObj);
-      #else
-      char *cString = PyBytes_AsString(pStrObj);
-      #endif
-      fout << "# " << cString << " " << std::endl;
+      if (PyList_Size(comment_array) != 0) {
+            PyObject* pStrObj = PyList_GetItem(comment_array, i);
+          #if PY_MAJOR_VERSION >= 3
+          PyObject* strObj = PyUnicode_AsUTF8String(pStrObj);
+          char *cString = PyBytes_AsString(strObj);
+          #else
+          char *cString = PyBytes_AsString(pStrObj);
+          #endif
+          fout << "# " << cString << " " << std::endl;
+      }
+      else {
+          fout << std::endl;
+      }
     }
 
     fout.close();
