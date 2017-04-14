@@ -12,6 +12,44 @@ currdir = os.path.dirname(os.path.abspath(__file__))
 datafile = os.path.join(currdir, "data", "svmlight_classification.txt")
 invalidfile = os.path.join(currdir, "data", "svmlight_invalid.txt")
 
+qid_datafile         = os.path.join(currdir, "data", "svmlight_classification_qid.txt")
+
+def test_load_svmlight_qid_file():
+    X, y, c, q = load_svmlight_file(qid_datafile)
+
+    # test X's shape
+    assert_equal(X.indptr.shape[0], 4)
+    assert_equal(X.shape[0], 3)
+    assert_equal(X.shape[1], 20)
+    assert_equal(y.shape[0], 3)
+
+    # test X's non-zero values
+    for i, j, val in ((0, 1, 2.5), (0, 9, -5.2), (0, 14, 1.5),
+                     (1, 4, 1.0), (1, 11, -3),
+                     (2, 19, 27)):
+
+        assert_equal(X[i, j], val)
+
+    # tests X's zero values
+    assert_equal(X[0, 2], 0)
+    assert_equal(X[0, 4], 0)
+    assert_equal(X[1, 7], 0)
+    assert_equal(X[1, 15], 0)
+    assert_equal(X[2, 17], 0)
+
+    # test can change X's values
+    X[0, 1] *= 2
+    assert_equal(X[0, 1], 5)
+
+    # test y
+    assert_array_equal(y, [1, 2, 3])
+
+    # test c
+    assert_array_equal(c, [" an inline comment", "", ""])
+
+    # test q
+    assert_array_equal(q, [1, 37, 12])
+
 
 def test_load_svmlight_file():
     X, y, c, q = load_svmlight_file(datafile)
@@ -42,6 +80,12 @@ def test_load_svmlight_file():
 
     # test y
     assert_array_equal(y, [1, 2, 3])
+
+    # test c
+    assert_array_equal(c, [" an inline comment", "", ""])
+
+    # test q
+    assert_equal(q.shape[0], 0)
 
 
 def test_load_svmlight_files():
