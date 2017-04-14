@@ -22,7 +22,7 @@ The projects follows the same API as scikit-learn:
 
 http://scikit-learn.org/dev/datasets/index.html#datasets-in-svmlight-libsvm-format
 
-Unsupported features: multilabel, query_id, reading from file objects.
+Unsupported features: multilabel, reading from file objects.
 
 Public datasets
 ===============
