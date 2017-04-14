@@ -14,7 +14,7 @@ invalidfile = os.path.join(currdir, "data", "svmlight_invalid.txt")
 
 
 def test_load_svmlight_file():
-    X, y = load_svmlight_file(datafile)
+    X, y, c, q = load_svmlight_file(datafile)
 
     # test X's shape
     assert_equal(X.indptr.shape[0], 4)
@@ -45,14 +45,14 @@ def test_load_svmlight_file():
 
 
 def test_load_svmlight_files():
-    X_train, y_train, X_test, y_test = load_svmlight_files([datafile] * 2,
+    X_train, y_train, c_train, q_train, X_test, y_test, c_test, q_test = load_svmlight_files([datafile] * 2,
                                                            dtype=np.float32)
     assert_array_equal(X_train.toarray(), X_test.toarray())
     assert_array_equal(y_train, y_test)
     assert_equal(X_train.dtype, np.float32)
     assert_equal(X_test.dtype, np.float32)
 
-    X1, y1, X2, y2, X3, y3 = load_svmlight_files([datafile] * 3,
+    X1, y1, c1, q1, X2, y2, c2, q2, X3, y3, c3, q3 = load_svmlight_files([datafile] * 3,
                                                  dtype=np.float64)
     assert_equal(X1.dtype, X2.dtype)
     assert_equal(X2.dtype, X3.dtype)
@@ -60,7 +60,7 @@ def test_load_svmlight_files():
 
 
 def test_load_svmlight_file_n_features():
-    X, y = load_svmlight_file(datafile, n_features=14)
+    X, y, c, q = load_svmlight_file(datafile, n_features=14)
 
     # test X'shape
     assert_equal(X.indptr.shape[0], 4)
@@ -96,7 +96,7 @@ def test_invalid_filename():
 
 def test_dump():
     try:
-        Xs, y = load_svmlight_file(datafile)
+        Xs, y, c, q = load_svmlight_file(datafile)
         tmpfile = "tmp_dump.txt"
         dump_svmlight_file(Xs, y, tmpfile, zero_based=False)
         X2, y2 = sk_load_svmlight_file(tmpfile)
