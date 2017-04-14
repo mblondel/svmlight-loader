@@ -149,3 +149,15 @@ def test_dump():
     finally:
         os.remove(tmpfile)
 
+def test_dump_qid():
+    try:
+        Xs, y, c, q = load_svmlight_file(qid_datafile)
+        tmpfile = "tmp_dump.txt"
+        dump_svmlight_file(Xs, y, tmpfile, comment=c, query_id=list(q), zero_based=False)
+        X2, y2, q2 = sk_load_svmlight_file(tmpfile, query_id=True)
+        assert_array_equal(Xs.toarray(), X2.toarray())
+        assert_array_equal(y, y2)
+        assert_array_equal(q, q2)
+    finally:
+        os.remove(tmpfile)
+
