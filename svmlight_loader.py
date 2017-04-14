@@ -47,10 +47,12 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
 
     Returns
     -------
-    (X, y)
+    (X, y, comments, query_ids)
 
     where X is a scipy.sparse matrix of shape (n_samples, n_features),
           y is a ndarray of shape (n_samples,).
+          comments is a list of length n_samples
+          query_ids is a ndarray of shape(nsamples,) or shape(0,) if none were specified
     """
     data, indices, indptr, labels, comments, qids = _load_svmlight_file(file_path, buffer_mb)
 
@@ -118,7 +120,7 @@ def load_svmlight_files(files, n_features=None, dtype=None, buffer_mb=40):
     return result
 
 
-def dump_svmlight_file(X, y, f, comment, zero_based=True):
+def dump_svmlight_file(X, y, f, comment=None, query_id=None, zero_based=True):
     """Dump the dataset in svmlight / libsvm file format.
 
     This format is a text-based format, with one sample per line. It does
@@ -139,8 +141,13 @@ def dump_svmlight_file(X, y, f, comment, zero_based=True):
     f : str
         Specifies the path that will contain the data.
 
-    comment : list, len = n_samples
+    comment : list, optional 
         Comments to append to each row after a # character
+        If specified, len(comment) must equal n_samples
+
+    query_id: list, optional 
+        Query identifiers to prepend to each row
+        If specified, len(query_id) must equal n_samples
 
     zero_based : boolean, optional
         Whether column indices should be written zero-based (True) or one-based
@@ -153,12 +160,22 @@ def dump_svmlight_file(X, y, f, comment, zero_based=True):
         raise ValueError("X.shape[0] and y.shape[0] should be the same, "
                          "got: %r and %r instead." % (X.shape[0], y.shape[0]))
 
-    if X.shape[0] != len(comment):
-        raise ValueError("X.shape[0] and len(comment) should be the same, "
+    if comment is None: 
+        comment = []
+    else:
+        if X.shape[0] != len(comment):
+            raise ValueError("X.shape[0] and len(comment) should be the same, "
+                         "got: %r and %r instead." % (X.shape[0], len(comment)))
+
+    if query_id is None:
+        query_id = []
+    else:
+        if X.shape[0] != len(comment):
+            raise ValueError("X.shape[0] and len(comment) should be the same, "
                          "got: %r and %r instead." % (X.shape[0], len(comment)))
 
     X = sp.csr_matrix(X, dtype=np.float64)
     y = np.array(y, dtype=np.float64)
     #comment = np.array(comment, dtype=np.string_)
 
-    _dump_svmlight_file(f, X.data, X.indices, X.indptr, y, comment, int(zero_based))
+    _dump_svmlight_file(f, X.data, query_id, X.indices, X.indptr, y, comment, int(zero_based))
