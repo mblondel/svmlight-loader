@@ -380,21 +380,24 @@ static PyMethodDef svmlight_format_methods[] = {
   {NULL, NULL, 0, NULL}
 };
 
-static const char svmlight_format_doc[] =
-  "Loader/Writer for svmlight / libsvm datasets - C++ helper routines";
+static struct PyModuleDef SVMLightLoader = 
+{
+  PyModuleDef_HEAD_INIT,
+  "_svmlight_loader",
+  "Loader/Writer for svmlight / libsvm datasets - C++ helper routines\n",
+  -1,   /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+  svmlight_format_methods
+};
 
 extern "C" {
-PyMODINIT_FUNC init_svmlight_loader(void)
+PyMODINIT_FUNC PyInit__svmlight_loader(void)
 {
   _import_array();
 
   init_type_objs();
-  if (PyType_Ready(&DoubleVOwnerType) < 0
-   || PyType_Ready(&IntVOwnerType)    < 0)
-    return;
+  if (PyType_Ready(&DoubleVOwnerType) < 0 || PyType_Ready(&IntVOwnerType) < 0)
+    return NULL;
 
-  Py_InitModule3("_svmlight_loader",
-                 svmlight_format_methods,
-                 svmlight_format_doc);
+  return PyModule_Create(&SVMLightLoader);
 }
 }
