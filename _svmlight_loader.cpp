@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+
 /*
  * A Python object responsible for memory management of our vectors.
  */
@@ -384,6 +385,29 @@ static const char svmlight_format_doc[] =
   "Loader/Writer for svmlight / libsvm datasets - C++ helper routines";
 
 extern "C" {
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef _svmlight_loader_definition = { 
+    PyModuleDef_HEAD_INIT,
+    "_svmlight_loader",
+    svmlight_format_doc,
+    -1, 
+    svmlight_format_methods
+};
+
+PyMODINIT_FUNC PyInit__svmlight_loader(void)
+{
+  Py_Initialize();
+  import_array();
+
+  init_type_objs();
+  if (PyType_Ready(&DoubleVOwnerType) < 0
+  || PyType_Ready(&IntVOwnerType)    < 0)
+  return NULL;
+
+  return PyModule_Create(&_svmlight_loader_definition);
+
+}
+#else 
 PyMODINIT_FUNC init_svmlight_loader(void)
 {
   _import_array();
@@ -397,4 +421,5 @@ PyMODINIT_FUNC init_svmlight_loader(void)
                  svmlight_format_methods,
                  svmlight_format_doc);
 }
+#endif
 }
