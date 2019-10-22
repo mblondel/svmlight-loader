@@ -11,6 +11,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from _svmlight_loader import _load_svmlight_file
+from _svmlight_loader import _load_svmlight_string
 from _svmlight_loader import _dump_svmlight_file
 
 
@@ -53,6 +54,62 @@ def load_svmlight_file(file_path, n_features=None, dtype=None,
           y is a ndarray of shape (n_samples,).
     """
     data, indices, indptr, labels = _load_svmlight_file(file_path, buffer_mb)
+
+    if zero_based is False or \
+       (zero_based == "auto" and np.min(indices) > 0):
+       indices -= 1
+
+    if n_features is not None:
+        shape = (indptr.shape[0] - 1, n_features)
+    else:
+        shape = None    # inferred
+
+    if dtype:
+        data = np.array(data, dtype=dtype)
+
+    X_train = sp.csr_matrix((data, indices, indptr), shape)
+
+    return (X_train, labels)
+
+def load_svmlight_string(s, n_features=None, dtype=None,
+                         zero_based="auto"):
+    """Load datasets in the svmlight / libsvm format into sparse CSR matrix
+
+    This format is a text-based format, with one sample per line. It does
+    not store zero valued features hence is suitable for sparse dataset.
+
+    The first element of each line can be used to store a target variable
+    to predict.
+
+    This format is used as the default format for both svmlight and the
+    libsvm command line programs.
+
+    Parsing a text based source can be expensive. When working on
+    repeatedly on the same dataset, it is recommended to wrap this
+    loader with joblib.Memory.cache to store a memmapped backup of the
+    CSR results of the first call and benefit from the near instantaneous
+    loading of memmapped structures for the subsequent calls.
+
+    Parameters
+    ----------
+    s: str
+        String data to load.
+
+    n_features: int or None
+        The number of features to use. If None, it will be inferred. This
+        argument is useful to load several files that are subsets of a
+        bigger sliced dataset: each subset might not have example of
+        every feature, hence the inferred shape might vary from one
+        slice to another.
+
+    Returns
+    -------
+    (X, y)
+
+    where X is a scipy.sparse matrix of shape (n_samples, n_features),
+          y is a ndarray of shape (n_samples,).
+    """
+    data, indices, indptr, labels = _load_svmlight_string(s)
 
     if zero_based is False or \
        (zero_based == "auto" and np.min(indices) > 0):
